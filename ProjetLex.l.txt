@@ -1,0 +1,106 @@
+%{            
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+enum TOKEN {FIN=0, PV, AFFECT, COND, ACG, ACD, ID, NUM, OP};
+enum CODEOPERATION {PLUS, MOINS, MOD};
+union {
+  char* nom;
+  int valeur;
+  enum CODEOPERATION cop;
+} yylval;
+
+void erreur_lexicale();
+
+%}
+
+%option yylineno
+
+blancs [ \t\n]+
+lettre [A-Z]
+lettre2 [A-F]
+chiffre [0-9]
+hexa [0-9A-F]
+ident $({lettre}|{chiffre})*
+entier ({chiffre}|{lettre2})+
+hexadecimal 0[xX]{hexa}+
+commentaire %[^%\n]*%
+%%
+{blancs} 
+; return PV;
+= return AFFECT;
+\? return COND;
+\{ return ACG;
+\} return ACD;
+{entier} { yylval.valeur = (int)strtol(yytext, NULL, 10); return NUM; }
+
+{hexadecimal} {
+    if (yytext[0] == '0' && yytext[1] == 'x') {
+        yylval.valeur = atoh(yytext + 2);/* appler atoh pour convertir le hexadecimale en valeur entiere*/
+        return NUM;
+    } else {
+        yylval.valeur = (int)strtol(yytext, NULL, 16);
+        return NUM;
+    }
+}
+{ident} { yylval.nom = strdup(yytext); return ID; }
+
+[-+%] { if (yytext[0]=='+')
+yylval.cop=PLUS;
+if (yytext[0]=='%')
+yylval.cop=MOD;
+if (yytext[0]=='-')
+yylval.cop=MOINS;
+return OP;
+}
+
+{commentaire} /* Ignore le commentaire */ ;
+
+. erreur_lexicale();
+%%
+
+int atoh(char* nombreHexa) {
+ /*cette fonction prend une chaîne de caractères hexadécimale en entrée et elle renvoie sa valeur décimale  en sortis*/
+   
+ 	int nombreDecimale = (int)strtol(nombreHexa, NULL, 16);/*convertit une chaîne de caractères hexadécimale en un nombre    entier et elle le stocke dans la variable nombreDecimale*/ 
+    
+    	return nombreDecimale;/* le résultat est ensuite converti en int et renvoyé.*/
+  }
+    
+void erreur_lexicale() {
+    printf("Erreur lexicale à la ligne %d : caractère illégal \"%s\"\n", yylineno, yytext);
+    exit(1);
+}
+
+int main(int argc, char* argv[]) {
+    enum TOKEN tc;
+    if (--argc > 1) {
+        printf("Usage:\n\t %s [nom_de_fichier]\n", argv[0]);
+        exit(2);
+    } else if (argc == 1) {
+        if ((yyin = fopen(argv[1], "r")) == NULL) {
+            printf("Impossible d’ouvrir le fichier <%s>.\n", argv[1]);
+            exit(3);
+        }
+    } else
+        printf("Taper un programme:\n\n");
+
+    while (tc = yylex()) {
+        switch (tc) {
+            case FIN: printf("<FIN>\n"); break;
+            case PV: printf("<PV>\n"); break;
+            case AFFECT: printf("<AFFECT>\n"); break;
+            case COND: printf("<COND>\n"); break;
+            case ACG: printf("<ACG>\n"); break;
+            case ACD: printf("<ACD>\n"); break;
+            case OP:
+                printf("<OP, %s>\n", (yylval.cop == PLUS) ? "PLUS" : (yylval.cop == MOINS) ? "MOINS" : "MOD");
+                break;
+            case ID: printf("<ID, \"%s\">\n", yylval.nom); break;
+            case NUM: printf("<NUM, %d>\n",yylval.valeur ); break;
+        }
+    }
+    printf("<FIN>\n");
+    return 0;
+}
